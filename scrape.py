@@ -32,7 +32,8 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
     result_messages = []
 
     def save_message_group(msgs, prev_msg):
-        result_messages.append({"group": [m.clean_content for m in msgs], "prev": prev_msg.clean_content if prev_msg else ""})
+        result_messages.append({"group": "\n".join([m.clean_content for m in msgs]), 
+                                "prev": prev_msg.clean_content if prev_msg else ""})
     
     # If specific channel provided
     if channel_id:
@@ -67,7 +68,9 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
             for i, message in enumerate(all_messages):
                 if message.author.id == user_id and message.clean_content != "":
                     # Check if we should start a new group due to time gap
-                    if current_group and (message.created_at - current_group[-1].created_at).total_seconds() > time_threshold_minutes * 60:
+                    if current_group and (
+                        (message.created_at - current_group[-1].created_at).total_seconds() > time_threshold_minutes * 60
+                        or message.type == discord.MessageType.reply):
     
                         save_message_group(current_group, preceding_message)
                         
@@ -76,12 +79,26 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
                         # Set preceding message to the message before this one
                         if i > 0:
                             preceding_message = all_messages[i-1]
+
+                        if message.type == discord.MessageType.reply:
+                            ref = message.reference
+                            if (ref and ref.type == discord.MessageReferenceType.reply 
+                                and ref.fail_if_not_exists
+                                and not isinstance(ref.resolved, discord.DeletedReferencedMessage)):
+                                preceding_message = ref.resolved
                     else:
                         # Add to current group
                         if not current_group:
                             # This is the first message in a new group
                             if i > 0:
                                 preceding_message = all_messages[i-1]
+
+                            if message.type == discord.MessageType.reply:
+                                ref = message.reference
+                                if (ref and ref.type == discord.MessageReferenceType.reply 
+                                    and not ref.fail_if_not_exists() 
+                                    and not isinstance(ref.resolved, discord.DeletedReferencedMessage)):
+                                    preceding_message = ref.resolved
                         
                         current_group.append(message)
                     
