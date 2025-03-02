@@ -27,7 +27,7 @@ prompt = """Below is a snippet of an online text conversation on Discord. The te
 
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name="loraOLD",  # folder name with saved safetensors, etc.
+    model_name="lora_model",  # folder name with saved safetensors, etc.
     max_seq_length=2048,
     load_in_4bit=True,
 )
@@ -60,26 +60,27 @@ async def on_message(message):
             return_tensors="pt",
         ).to("cuda")
 
-        outputs = model.generate(**inputs, max_new_tokens=64, use_cache=True)
+        outputs = model.generate(**inputs, max_new_tokens=64, use_cache=True, temperature=0.99)
         generated = tokenizer.batch_decode(outputs)
 
-        generated = str(generated)
+        generated = str(generated[0])
+
+        print("\n response: \n", generated)
         
-        pattern = r"(?<=### Response:\\n)(.*)(?=])"
+        pattern = r"(?<=### Response:\n)(.*)"
 
         # Search for the pattern in the text
-        match = re.search(pattern, str(generated))
+        match = re.search(pattern, str(generated), re.DOTALL)
 
         if match:
             generated = match.group(1) 
             generated = generated.replace(r'\\n', '\n')
             generated = generated.replace('<eos>', '')
-            if generated[-1] == "'" or generated[-1] == '"':
-                generated = generated[0:-2]
         else:
             print("No match found")
 
-        await message.reply(generated)
+        for line in generated.split("\n"):
+            await message.channel.send(line)
     
     # Process commands
     await bot.process_commands(message)
