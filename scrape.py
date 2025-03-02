@@ -48,9 +48,9 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
         channels = [channel for guild in client.guilds for channel in guild.text_channels]
     
     # Iterate through all channels
-    for channel in channels:
+    for channel_idx, channel in enumerate(channels):
         try:
-            print(f"Scraping messages from {channel.name}...")
+            print(f"[{channel_idx}/{len(channels)}] Scraping messages from {channel.name}...")
             
             # Get all messages in the channel
             all_messages = []
@@ -192,7 +192,7 @@ async def on_ready():
     
     # Add timestamp to filename if it doesn't have one
     filename = args.output
-    # if '.csv' in args.output:
+    if '.csv' in args.output:
         filename = args.output.replace('.csv', f'_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
     else:
         filename = f"{args.output}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
