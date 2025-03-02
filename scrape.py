@@ -4,6 +4,19 @@ import os
 import datetime
 import argparse
 from dotenv import load_dotenv
+import re
+
+def is_link(text):
+    # Regular expression pattern for URL validation
+    url_pattern = re.compile(
+        r'^(?:http|https)://'  # http:// or https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain
+        r'localhost|'  # localhost
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # or IP
+        r'(?::\d+)?'  # optional port
+        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    
+    return bool(url_pattern.match(text))
 
 # Load environment variables from .env file
 load_dotenv()
@@ -66,7 +79,7 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
             
             # Process messages
             for i, message in enumerate(all_messages):
-                if message.author.id == user_id and message.clean_content != "":
+                if message.author.id == user_id and message.clean_content != "" and not is_link(message.clean_content):
                     # Check if we should start a new group due to time gap
                     if current_group and (
                         (message.created_at - current_group[-1].created_at).total_seconds() > time_threshold_minutes * 60
