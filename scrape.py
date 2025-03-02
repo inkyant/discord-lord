@@ -59,7 +59,7 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
             
             # Reverse to process in chronological order
             all_messages.reverse()
-            
+
             # Variables for tracking message grouping
             current_group = []
             preceding_message = None
@@ -96,7 +96,7 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
                             if message.type == discord.MessageType.reply:
                                 ref = message.reference
                                 if (ref and ref.type == discord.MessageReferenceType.reply 
-                                    and not ref.fail_if_not_exists() 
+                                    and ref.fail_if_not_exists
                                     and not isinstance(ref.resolved, discord.DeletedReferencedMessage)):
                                     preceding_message = ref.resolved
                         
@@ -191,10 +191,11 @@ async def on_ready():
     messages = await scrape_user_messages(args.user_id, args.channel_id, args.limit, args.time_gap)
     
     # Add timestamp to filename if it doesn't have one
-    if '.csv' in args.output:
-        filename = args.output.replace('.csv', f'_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
-    else:
-        filename = f"{args.output}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = args.output
+    # if '.csv' in args.output:
+    #     filename = args.output.replace('.csv', f'_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
+    # else:
+    #     filename = f"{args.output}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     
     # Save to CSV
     save_to_csv(messages, filename)
