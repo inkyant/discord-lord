@@ -63,7 +63,7 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
     # Iterate through all channels
     for channel_idx, channel in enumerate(channels):
         try:
-            print(f"[{channel_idx}/{len(channels)}] Scraping messages from {channel.name}...")
+            print(f"[{channel_idx}/{len(channels)}] Scraping messages from {channel.name} in {channel.guild.name}...")
             
             # Get all messages in the channel
             all_messages = []
