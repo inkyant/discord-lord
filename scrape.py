@@ -15,19 +15,24 @@ intents.members = True
 
 client = discord.Client(intents=intents)
 
-async def scrape_user_messages(user_id, channel_id=None, limit=None):
+async def scrape_user_messages(user_id, channel_id=None, limit=None, time_threshold_minutes=30):
     """
     Scrape messages from a specific user, combining consecutive messages and tracking preceding messages.
+    Messages are grouped separately if there's a time gap greater than the threshold.
     
     Args:
         user_id: The ID of the user to scrape messages from
         channel_id: Optional ID of the channel to scrape from. If None, all channels will be searched.
         limit: Maximum number of messages to retrieve per channel (None = no limit)
+        time_threshold_minutes: Time threshold in minutes to separate message groups
     
     Returns:
         A list of message data dictionaries
     """
     result_messages = []
+
+    def save_message_group(msgs, prev_msg):
+        result_messages.append({"group": [m.clean_content for m in msgs], "prev": prev_msg.clean_content if prev_msg else ""})
     
     # If specific channel provided
     if channel_id:
@@ -61,37 +66,45 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None):
             # Process messages
             for i, message in enumerate(all_messages):
                 if message.author.id == user_id and message.clean_content != "":
-                    # Add to current group if this is a target user message
-                    current_group.append(message)
-                    
-                    # If this is the first message in a potential group, set the preceding message
-                    if len(current_group) == 1 and i > 0:
-                        preceding_message = all_messages[i-1]
-                    
-                    # If this is the last message or next message is from different user, save the group
-                    if i == len(all_messages) - 1 or all_messages[i+1].author.id != user_id:
-                        # Combine messages in group
-                        combined_content = "\n".join([msg.clean_content for msg in current_group])
-                        first_msg = current_group[0]
-
-                        if first_msg.type == discord.MessageType.reply and type(first_msg.reference.resolved) != discord.DeletedReferencedMessage:
-                            preceding_message = first_msg.reference.resolved
+                    # Check if we should start a new group due to time gap
+                    if current_group and (message.created_at - current_group[-1].created_at).total_seconds() > time_threshold_minutes * 60:
+    
+                        save_message_group(current_group, preceding_message)
                         
-                        # Create record
-                        message_data = {
-                            'combined_content': combined_content,
-                            'message_count': len(current_group),
-                            'preceding_content': preceding_message.clean_content if preceding_message else ""
-                        }
+                        # Start a new group with the current message
+                        current_group = [message]
+                        # Set preceding message to the message before this one
+                        if i > 0:
+                            preceding_message = all_messages[i-1]
+                    else:
+                        # Add to current group
+                        if not current_group:
+                            # This is the first message in a new group
+                            if i > 0:
+                                preceding_message = all_messages[i-1]
                         
-                        result_messages.append(message_data)
+                        current_group.append(message)
+                    
+                    # If this is the last message, save the group
+                    if i == len(all_messages) - 1:
+                        save_message_group(current_group, preceding_message)
+                    
+                    # Check if next message is from a different user
+                    elif i < len(all_messages) - 1 and all_messages[i+1].author.id != user_id:
+                        save_message_group(current_group, preceding_message)
                         
                         # Reset for next group
                         current_group = []
                         preceding_message = None
                 else:
-                    # Reset current group if this isn't a target user message
-                    current_group = []
+                    # This message is from a different user
+                    # If we had a group going, save it
+                    if current_group:
+                        save_message_group(current_group, preceding_message)
+                        
+                        # Reset for next group
+                        current_group = []
+                        preceding_message = None
             
         except discord.errors.Forbidden:
             print(f"Cannot access channel {channel.name} due to permissions.")
@@ -129,6 +142,7 @@ async def on_ready():
     parser.add_argument('--channel_id', type=int, help='Channel ID to scrape from (optional)')
     parser.add_argument('--limit', type=int, help='Maximum number of messages to retrieve per channel')
     parser.add_argument('--output', type=str, default='./data/messages.csv', help='Output CSV file path')
+    parser.add_argument('--time_gap', type=int, default=30, help='Time gap in minutes to separate message groups (default: 30)')
     
     # Get command-line arguments
     try:
@@ -142,6 +156,8 @@ async def on_ready():
         channel_id = int(channel_id_input) if channel_id_input else None
         limit_input = input("Message limit per channel (leave blank for no limit): ")
         limit = int(limit_input) if limit_input else None
+        time_gap_input = input("Time gap in minutes to separate message groups (default: 30): ")
+        time_gap = int(time_gap_input) if time_gap_input else 30
         output = input("Output file path (default: ./data/messages.csv): ") or './data/messages.csv'
         
         class Args:
@@ -151,10 +167,11 @@ async def on_ready():
         args.user_id = user_id
         args.channel_id = channel_id
         args.limit = limit
+        args.time_gap = time_gap
         args.output = output
     
     # Scrape the messages
-    messages = await scrape_user_messages(args.user_id, args.channel_id, args.limit)
+    messages = await scrape_user_messages(args.user_id, args.channel_id, args.limit, args.time_gap)
     
     # Add timestamp to filename if it doesn't have one
     if '.csv' in args.output:
