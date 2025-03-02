@@ -193,9 +193,9 @@ async def on_ready():
     # Add timestamp to filename if it doesn't have one
     filename = args.output
     # if '.csv' in args.output:
-    #     filename = args.output.replace('.csv', f'_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
-    # else:
-    #     filename = f"{args.output}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = args.output.replace('.csv', f'_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.csv')
+    else:
+        filename = f"{args.output}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     
     # Save to CSV
     save_to_csv(messages, filename)
