@@ -6,6 +6,8 @@ import argparse
 from dotenv import load_dotenv
 import re
 
+EXCLUDED_CHANNELS = []
+
 def is_link(text):
     # Regular expression pattern for URL validation
     url_pattern = re.compile(
@@ -27,6 +29,15 @@ intents.message_content = True
 intents.members = True
 
 client = discord.Client(intents=intents)
+
+def without_pings(msg: discord.Message):
+    text = msg.content
+    for id in msg.raw_mentions:
+        text = text.replace(f"<@{id}>", "")
+    for id in msg.raw_role_mentions:
+        text = text.replace(f"<@&{id}>", "")
+    return text
+
 
 async def scrape_user_messages(user_id, channel_id=None, limit=None, time_threshold_minutes=30):
     """
@@ -62,6 +73,9 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
     
     # Iterate through all channels
     for channel_idx, channel in enumerate(channels):
+        if channel.id in EXCLUDED_CHANNELS:
+            print("Skipping channel ", channel.name, " due to exlusion set in code.")
+            continue
         try:
             print(f"[{channel_idx}/{len(channels)}] Scraping messages from {channel.name} in {channel.guild.name}...")
             
@@ -79,7 +93,15 @@ async def scrape_user_messages(user_id, channel_id=None, limit=None, time_thresh
             
             # Process messages
             for i, message in enumerate(all_messages):
-                if message.author.id == user_id and message.clean_content != "" and not is_link(message.clean_content):
+                if (message.author.id == user_id):
+
+                    if (message.clean_content == ""):
+                        continue 
+                    if (is_link(message.clean_content)
+                        or len(without_pings(message).replace(" ", ""))) == 0:
+                        print("skipping message: ", message.clean_content)
+
+
                     # Check if we should start a new group due to time gap
                     if current_group and (
                         (message.created_at - current_group[-1].created_at).total_seconds() > time_threshold_minutes * 60
