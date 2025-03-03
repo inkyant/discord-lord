@@ -42,7 +42,7 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 # add fine tuning LoRA adapters
 model = FastLanguageModel.get_peft_model(
     model,
-    r = 16, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
+    r = 32, # Choose any number > 0 ! Suggested 8, 16, 32, 64, 128
     target_modules = ["q_proj", "k_proj", "v_proj", "o_proj",
                       "gate_proj", "up_proj", "down_proj",],
     lora_alpha = 16,
@@ -92,12 +92,14 @@ def formatting_prompts_func(examples):
     return { "text" : texts, }
 
 from datasets import load_dataset
-dataset = load_dataset("csv", data_files="./scraped_2.csv", split="train")
+dataset = load_dataset("csv", data_files="./scraped_2edited.csv", split="train")
 dataset_formatted = dataset.map(formatting_prompts_func, batched = True,)
 
-dataset_formatted['text'][0]
-dataset_formatted['text'][98]
-dataset_formatted['text'][1285]
+print()
+print(dataset_formatted['text'][0])
+print(dataset_formatted['text'][98])
+print(dataset_formatted['text'][1285])
+
 
 """<a name="Train"></a>
 ### Train the model
@@ -118,9 +120,10 @@ trainer = SFTTrainer(
     packing = False, # Can make training 5x faster for short sequences.
     args = TrainingArguments(
         per_device_train_batch_size = 2,
-        gradient_accumulation_steps = 4,
+        gradient_accumulation_steps = 8,
         warmup_steps = 5,
-        max_steps = 200,
+        num_train_epochs=1,
+        # max_steps = None,
         learning_rate = 2e-4,
         fp16 = not is_bfloat16_supported(),
         bf16 = is_bfloat16_supported(),
